@@ -26,10 +26,30 @@ export default function TimeChart({ data }: { data: any }) {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" />
         <YAxis />
-        <Tooltip />
+        <Tooltip
+          formatter={(value, name, item, index, payload) =>
+            parseInt(value.toString())
+          }
+        />
         <Legend />
-        <Line type="monotone" dataKey="pv" stroke="#143d59" />
-        <Line type="monotone" dataKey="uv" stroke="#fcac3b" />
+        <Line
+          type="monotone"
+          dataKey="investBalance"
+          stroke="#143d59"
+          dot={false}
+        />
+        <Line
+          type="monotone"
+          dataKey="loanBalance"
+          stroke="#fcac3b"
+          dot={false}
+        />
+        <Line
+          type="monotone"
+          dataKey="cashInvestmentValue"
+          stroke="#3894d2"
+          dot={false}
+        />
       </LineChart>
     </ResponsiveContainer>
   );

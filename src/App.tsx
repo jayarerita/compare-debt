@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import TimeChart from "./components/data/lineChart";
+import type { ChartData } from "./lib/customTypes";
+import { DataTable } from "./components/data/dataTable";
 
 type DividendTimeFrameProps = {
   timeFrame: "monthly" | "quarterly" | "annually";
@@ -27,7 +29,7 @@ const DividendTimeFrame = ({
       </Label>
       <RadioGroup
         value={timeFrame}
-        className="ml-2"
+        className="ml-2 flex"
         onValueChange={(value) => {
           handleRadioChange(value);
         }}
@@ -49,19 +51,31 @@ const DividendTimeFrame = ({
   );
 };
 
-const calc_dividends = (investBalance: number, dividendRate: number): number =>
-  investBalance * dividendRate;
+const calc_dividends = (
+  investBalance: number,
+  dividendRate: number,
+  timeFrame: "monthly" | "quarterly" | "annually"
+): number => {
+  if (timeFrame === "monthly") {
+    return investBalance * dividendRate;
+  }
+  if (timeFrame === "quarterly") {
+    return (investBalance * dividendRate) / 3;
+  }
+  return (investBalance * dividendRate) / 12;
+};
 
 const calc_invest_balance = (
   invest_balance: number,
   exp_ratio: number,
   return_rate: number,
   dividend_rate: number,
-  monthly_contribution: number
+  monthly_contribution: number,
+  timeFrame: "monthly" | "quarterly" | "annually" = "quarterly"
 ): number =>
   invest_balance +
-  invest_balance * (return_rate - exp_ratio) +
-  calc_dividends(invest_balance, dividend_rate) +
+  invest_balance * (return_rate / 12 - exp_ratio) +
+  calc_dividends(invest_balance, dividend_rate, timeFrame) +
   monthly_contribution;
 
 const req_mon_payment = (
@@ -82,15 +96,6 @@ const loan_remaining = (
   balance: number
 ): number => balance - (mon_pay - balance * (rate / 12) + prin_pay);
 
-type ChartData = {
-  loanBalace: number;
-  investBalance: number;
-  month: number;
-  date: Date;
-  netWorth: number;
-  name: string;
-};
-
 function App() {
   const [loanAprLive, setLoanAprLive] = useState(5.0);
   const [loanAprCommitted, setLoanAprCommitted] = useState(5.0);
@@ -100,10 +105,14 @@ function App() {
   const [invApr, setInvApr] = useState(10);
   const [expenseRatio, setExpenseRatio] = useState(0.5);
   const [estDividend, setEstDividend] = useState(1);
-  const [timeHorizon, setTimeHorizon] = useState(20);
+  const [timeHorizon, setTimeHorizon] = useState(15);
   const [timeFrame, setTimeFrame] = useState<
     "monthly" | "quarterly" | "annually"
   >("quarterly");
+  const [monthlyContribution, setMonthlyContribution] = useState(500);
+  const [contributionBalanceLive, setContributionBalanceLive] = useState(0.5);
+  const [contributionBalanceCommitted, setContributionBalanceCommitted] =
+    useState(0.5);
 
   const taxRate = 0.2 + 0.038;
   // The tax rate to apply to investment with drawals, expressed as .3 = 30%, here we use 20% capital gains plus 3.8% Net Income Investment Tax
@@ -111,38 +120,128 @@ function App() {
   // Loop over every month in the time horizon
   const [chartData, setChartData] = useState<ChartData[]>([]);
 
-  useEffect(() => {
-    for (let i = 0; i < timeHorizon * 12; i++) {
-      const date = new Date();
-      date.setMonth(date.getMonth() + i);
-      const month = i + 1;
-      const loanPayment = req_mon_payment(loanAmt, loanAprCommitted);
-      const investBalance = calc_invest_balance(
-        invBalanceCurrent,
-        expenseRatio,
-        invApr,
-        estDividend,
-        loanPayment
-      );
-      const loanBalance = loan_remaining(
+  const getMonthlyData = (
+    date: Date,
+    monthNumber: number,
+    currentInvBalance: number,
+    currentLoanBalance: number
+  ) => {
+    date.setMonth(date.getMonth());
+    let loanPayment = req_mon_payment(loanAmt, loanAprCommitted / 100);
+
+    let monthlyContributionActual =
+      monthlyContribution * contributionBalanceCommitted;
+    let principalPayment =
+      monthlyContribution * (1 - contributionBalanceCommitted);
+    let loanBalance = currentLoanBalance;
+    if (loanPayment + principalPayment > currentLoanBalance) {
+      loanBalance = 0;
+      monthlyContributionActual +=
+        loanPayment - currentLoanBalance + principalPayment;
+      loanPayment = currentLoanBalance;
+    } else {
+      loanBalance = loan_remaining(
         loanPayment,
-        loanPayment - loanBalanceCurrent * (loanAprCommitted / 12),
-        loanAprCommitted / 12,
-        loanBalanceCurrent
+        principalPayment,
+        loanAprCommitted / 100,
+        currentLoanBalance
       );
-      const netWorth = investBalance - loanBalance;
-      setChartData((prev) => [
-        ...prev,
-        {
-          loanBalace: loanBalance,
-          investBalance,
-          month,
-          date,
-          netWorth,
-          name: date.toLocaleDateString(),
-        },
-      ]);
     }
+
+    const investBalance = calc_invest_balance(
+      currentInvBalance,
+      expenseRatio / 100,
+      invApr / 100,
+      estDividend / 100,
+      monthlyContributionActual,
+      timeFrame
+    );
+    const netWorth = investBalance - loanBalance;
+    const cashInvestmentValue = investBalance * (1 - taxRate);
+    const outOfPocket = loanPayment + monthlyContributionActual;
+    return {
+      date,
+      month: monthNumber,
+      loanPayment,
+      investBalance,
+      loanBalance,
+      netWorth,
+      cashInvestmentValue,
+      outOfPocket,
+      principalPayment: principalPayment,
+      investmentPayment: monthlyContributionActual,
+    };
+  };
+
+  useEffect(() => {
+    let curChartData: ChartData[] = [];
+    for (let i = 0; i < timeHorizon * 12; i++) {
+      if (i === 0) {
+        const {
+          date,
+          month,
+          loanPayment,
+          investBalance,
+          loanBalance,
+          netWorth,
+          cashInvestmentValue,
+          outOfPocket,
+          principalPayment,
+          investmentPayment,
+        } = getMonthlyData(
+          new Date(),
+          1,
+          invBalanceCurrent,
+          loanBalanceCurrent
+        );
+        curChartData.push({
+          date,
+          month,
+          loanPayment,
+          investBalance,
+          loanBalance,
+          netWorth,
+          cashInvestmentValue,
+          outOfPocket,
+          principalPayment,
+          investmentPayment,
+          name: date.toLocaleDateString(),
+        });
+        continue;
+      }
+      const prevMonth = curChartData[i - 1];
+      const date = new Date(prevMonth.date);
+      date.setMonth(date.getMonth() + 1);
+      const {
+        loanPayment,
+        investBalance,
+        loanBalance,
+        netWorth,
+        cashInvestmentValue,
+        outOfPocket,
+        principalPayment,
+        investmentPayment,
+      } = getMonthlyData(
+        date,
+        i + 1,
+        prevMonth.investBalance,
+        prevMonth.loanBalance
+      );
+      curChartData.push({
+        date,
+        month: i + 1,
+        loanPayment,
+        investBalance,
+        loanBalance,
+        netWorth,
+        cashInvestmentValue,
+        outOfPocket,
+        principalPayment,
+        investmentPayment,
+        name: date.toLocaleDateString(),
+      });
+    }
+    setChartData(curChartData);
   }, [
     loanBalanceCurrent,
     loanAmt,
@@ -152,6 +251,7 @@ function App() {
     expenseRatio,
     estDividend,
     timeHorizon,
+    contributionBalanceCommitted,
   ]);
 
   return (
@@ -277,7 +377,7 @@ function App() {
             setTimeFrame={setTimeFrame}
           />
         </div>
-        <div className="mx-auto">
+        <div className="grid grid-cols-2 gap-4 mx-auto">
           <div className="grid w-full max-w-sm gap-1.5">
             <Label htmlFor="time-horizon" className="w-max">
               Time Horizon
@@ -285,6 +385,7 @@ function App() {
             <div className="flex items-center gap-2">
               <Input
                 type="number"
+                min={2}
                 id="time-horizon"
                 placeholder="20"
                 className="ml-2"
@@ -294,10 +395,54 @@ function App() {
               <div className="text-sm text-gray-500 w-6">years</div>
             </div>
           </div>
+          <div className="grid w-full max-w-sm gap-1.5">
+            <Label htmlFor="monthly-contribution" className="w-max">
+              Monthly Contribution
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                id="monthly-contribution"
+                placeholder="500"
+                className="ml-2"
+                value={monthlyContribution}
+                onChange={(e) => setMonthlyContribution(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 col-span-2">
+            <div className="flex flex-col gap-2">
+              <div className="text-sm text-gray-500 w-16">Investment</div>
+              <div className="text-sm text-gray-500 w-16">
+                {(monthlyContribution * contributionBalanceLive).toFixed(0)}
+              </div>
+            </div>
+            <Slider
+              max={1}
+              step={0.1}
+              min={0}
+              value={[contributionBalanceLive]}
+              className={`ml-2`}
+              onValueChange={(value) => setContributionBalanceLive(value[0])}
+              onValueCommit={(value) =>
+                setContributionBalanceCommitted(value[0])
+              }
+            />
+            <div className="flex flex-col gap-2">
+              <div className="text-sm text-gray-500 w-16">Loan</div>
+              <div className="text-sm text-gray-500 w-16">
+                {(monthlyContribution * (1 - contributionBalanceLive)).toFixed(
+                  0
+                )}
+              </div>
+            </div>
+          </div>
         </div>
         <div className="w-full h-96">
           <TimeChart data={chartData} />
         </div>
+        <DataTable data={chartData} />
       </div>
     </>
   );
