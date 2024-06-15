@@ -257,6 +257,9 @@ function App() {
   return (
     <>
       <div className="flex flex-col gap-16 items-center justify-center min-h-screen py-2">
+        <img src="/rocket_money_light.svg" alt="logo" className="h-24" />
+        <div className="text-3xl font-bold">Investment vs Loan Calculator</div>
+
         <div className="flex flex-col w-max gap-2">
           <div className="grid grid-cols-2 gap-2">
             <div className="grid w-full max-w-sm gap-1.5">
