@@ -33,8 +33,8 @@ export const DataTable = ({ data }: { data: ChartData[] }) => {
             <TableCell>{row.investBalance.toFixed(2)}</TableCell>
             <TableCell>{row.loanBalance.toFixed(2)}</TableCell>
             <TableCell>{row.loanPayment.toFixed(2)}</TableCell>
-            <TableCell>{row.investmentPayment}</TableCell>
-            <TableCell>{row.principalPayment}</TableCell>
+            <TableCell>{row.investmentPayment.toFixed(2)}</TableCell>
+            <TableCell>{row.principalPayment.toFixed(2)}</TableCell>
             <TableCell>{row.outOfPocket.toFixed(2)}</TableCell>
             <TableCell>{row.cashInvestmentValue.toFixed(2)}</TableCell>
             <TableCell>{row.netWorth.toFixed(2)}</TableCell>

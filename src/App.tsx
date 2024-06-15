@@ -3,53 +3,12 @@ import "./App.css";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import TimeChart from "./components/data/lineChart";
 import type { ChartData } from "./lib/customTypes";
 import { DataTable } from "./components/data/dataTable";
+import { DividendTimeFrame } from "@/components/customUi/dividendRadio";
+import { LoanTerm } from "@/components/customUi/loanTermRadio";
 
-type DividendTimeFrameProps = {
-  timeFrame: "monthly" | "quarterly" | "annually";
-  setTimeFrame: (timeFrame: "monthly" | "quarterly" | "annually") => void;
-};
-
-const DividendTimeFrame = ({
-  timeFrame,
-  setTimeFrame,
-}: DividendTimeFrameProps) => {
-  // Add a change handler to the RadioGroup component
-  const handleRadioChange = (value: string) => {
-    setTimeFrame(value as "monthly" | "quarterly" | "annually");
-  };
-
-  return (
-    <div className="grid w-full gap-1.5">
-      <Label htmlFor="dividend-time-frame" className="w-max">
-        Dividend Time Frame
-      </Label>
-      <RadioGroup
-        value={timeFrame}
-        className="ml-2 flex"
-        onValueChange={(value) => {
-          handleRadioChange(value);
-        }}
-      >
-        <div className="flex items-center space-x-2">
-          <RadioGroupItem value="montly" id="r1" />
-          <Label htmlFor="r1">Monthly</Label>
-        </div>
-        <div className="flex items-center space-x-2">
-          <RadioGroupItem value="quarterly" id="r2" />
-          <Label htmlFor="r2">Quarterly</Label>
-        </div>
-        <div className="flex items-center space-x-2">
-          <RadioGroupItem value="annually" id="r3" />
-          <Label htmlFor="r3">Annually</Label>
-        </div>
-      </RadioGroup>
-    </div>
-  );
-};
 
 const calc_dividends = (
   investBalance: number,
@@ -74,7 +33,7 @@ const calc_invest_balance = (
   timeFrame: "monthly" | "quarterly" | "annually" = "quarterly"
 ): number =>
   invest_balance +
-  invest_balance * (return_rate / 12 - exp_ratio) +
+  invest_balance * (return_rate / 12 - exp_ratio / 12) +
   calc_dividends(invest_balance, dividend_rate, timeFrame) +
   monthly_contribution;
 
@@ -86,7 +45,8 @@ const req_mon_payment = (
 ): number => {
   const months = loan_length * 12;
   const rate = apr / annual_pay_periods;
-  return (loan_amt * rate * (1 + rate) ** months) / ((1 + rate) ** months - 1);
+  // M = P [ I(1 + I)N ] / [ (1 + I)N − 1]
+  return ( loan_amt * rate * ( 1 + rate ) ** months ) / ( ( ( 1 + rate ) ** months ) - 1 );
 };
 
 const loan_remaining = (
@@ -94,7 +54,7 @@ const loan_remaining = (
   prin_pay: number,
   rate: number,
   balance: number
-): number => balance - (mon_pay - balance * (rate / 12) + prin_pay);
+): number => balance - (mon_pay + prin_pay - (balance * (rate / 12)));
 
 function App() {
   const [loanAprLive, setLoanAprLive] = useState(5.0);
@@ -113,6 +73,7 @@ function App() {
   const [contributionBalanceLive, setContributionBalanceLive] = useState(0.5);
   const [contributionBalanceCommitted, setContributionBalanceCommitted] =
     useState(0.5);
+  const [ loanTerm, setLoanTerm ] = useState< 30 | 15 >(30);
 
   const taxRate = 0.2 + 0.038;
   // The tax rate to apply to investment with drawals, expressed as .3 = 30%, here we use 20% capital gains plus 3.8% Net Income Investment Tax
@@ -135,10 +96,16 @@ function App() {
       monthlyContribution * (1 - contributionBalanceCommitted);
     let loanBalance = currentLoanBalance;
     if (loanPayment + principalPayment > currentLoanBalance) {
-      loanBalance = 0;
-      monthlyContributionActual +=
-        loanPayment - currentLoanBalance + principalPayment;
-      loanPayment = currentLoanBalance;
+      if (currentLoanBalance === 0) {
+        loanPayment = 0;
+        principalPayment = 0;
+        monthlyContributionActual = monthlyContribution + loanPayment;
+      } else {
+        monthlyContributionActual +=
+          loanPayment - currentLoanBalance + principalPayment;
+        loanPayment = currentLoanBalance;
+        loanBalance = 0;
+      }
     } else {
       loanBalance = loan_remaining(
         loanPayment,
@@ -158,7 +125,7 @@ function App() {
     );
     const netWorth = investBalance - loanBalance;
     const cashInvestmentValue = investBalance * (1 - taxRate);
-    const outOfPocket = loanPayment + monthlyContributionActual;
+    const outOfPocket = loanPayment + monthlyContributionActual + principalPayment;
     return {
       date,
       month: monthNumber,
@@ -174,7 +141,7 @@ function App() {
   };
 
   useEffect(() => {
-    let curChartData: ChartData[] = [];
+    const curChartData: ChartData[] = [];
     for (let i = 0; i < timeHorizon * 12; i++) {
       if (i === 0) {
         const {
@@ -252,6 +219,7 @@ function App() {
     estDividend,
     timeHorizon,
     contributionBalanceCommitted,
+    monthlyContribution
   ]);
 
   return (
@@ -261,7 +229,7 @@ function App() {
         <div className="text-3xl font-bold">Investment vs Loan Calculator</div>
 
         <div className="flex flex-col w-max gap-2">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-4">
             <div className="grid w-full max-w-sm gap-1.5">
               <Label htmlFor="loan-balance" className="w-max">
                 Loan Balance
@@ -288,6 +256,7 @@ function App() {
                 onChange={(e) => setLoanAmt(Number(e.target.value))}
               />
             </div>
+            <LoanTerm loanTerm={loanTerm} setLoanTerm={setLoanTerm} />
           </div>
           <div className="grid w-full gap-1.5">
             <Label htmlFor="loan-apr" className="w-max">
@@ -304,6 +273,16 @@ function App() {
                 onValueCommit={(value) => setLoanAprCommitted(value[0])}
               />
               <div className="text-sm text-gray-500 w-16">{loanAprLive}%</div>
+            </div>
+          </div>
+          <div className="grid w-full gap-1.5">
+            <Label htmlFor="loan-apr" className="w-max">
+              Monthly Payment
+            </Label>
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-gray-500 w-16">
+                {req_mon_payment(loanAmt, loanAprLive/100).toFixed(2)}
+              </div>
             </div>
           </div>
         </div>

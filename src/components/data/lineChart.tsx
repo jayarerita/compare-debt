@@ -27,6 +27,7 @@ export default function TimeChart({ data }: { data: any }) {
         <XAxis dataKey="name" />
         <YAxis />
         <Tooltip
+          // @ts-expect-error Not using name, item, index, payload but required by recharts
           formatter={(value, name, item, index, payload) =>
             parseInt(value.toString())
           }
