@@ -3,12 +3,18 @@ import "./App.css";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import TimeChart from "./components/data/lineChart";
-import type { ChartData } from "./lib/customTypes";
-import { DataTable } from "./components/data/dataTable";
+import TimeChart from "@/components/data/lineChart";
+import type { ChartData } from "@/lib/customTypes";
+import { DataTable } from "@/components/data/dataTable";
 import { DividendTimeFrame } from "@/components/customUi/dividendRadio";
 import { LoanTerm } from "@/components/customUi/loanTermRadio";
-
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import Latex from "react-latex";
 
 const calc_dividends = (
   investBalance: number,
@@ -45,8 +51,8 @@ const req_mon_payment = (
 ): number => {
   const months = loan_length * 12;
   const rate = apr / annual_pay_periods;
-  // M = P [ I(1 + I)N ] / [ (1 + I)N − 1]
-  return ( loan_amt * rate * ( 1 + rate ) ** months ) / ( ( ( 1 + rate ) ** months ) - 1 );
+  // M = P [ I(1 + I)^N ] / [ (1 + I)^N − 1]
+  return (loan_amt * rate * (1 + rate) ** months) / ((1 + rate) ** months - 1);
 };
 
 const loan_remaining = (
@@ -54,7 +60,7 @@ const loan_remaining = (
   prin_pay: number,
   rate: number,
   balance: number
-): number => balance - (mon_pay + prin_pay - (balance * (rate / 12)));
+): number => balance - (mon_pay + prin_pay - balance * (rate / 12));
 
 function App() {
   const [loanAprLive, setLoanAprLive] = useState(5.0);
@@ -73,7 +79,7 @@ function App() {
   const [contributionBalanceLive, setContributionBalanceLive] = useState(0.5);
   const [contributionBalanceCommitted, setContributionBalanceCommitted] =
     useState(0.5);
-  const [ loanTerm, setLoanTerm ] = useState< 30 | 15 >(30);
+  const [loanTerm, setLoanTerm] = useState<30 | 15>(30);
 
   const taxRate = 0.2 + 0.038;
   // The tax rate to apply to investment with drawals, expressed as .3 = 30%, here we use 20% capital gains plus 3.8% Net Income Investment Tax
@@ -85,10 +91,15 @@ function App() {
     date: Date,
     monthNumber: number,
     currentInvBalance: number,
-    currentLoanBalance: number
+    currentLoanBalance: number,
+    loanLength: number
   ) => {
     date.setMonth(date.getMonth());
-    let loanPayment = req_mon_payment(loanAmt, loanAprCommitted / 100);
+    let loanPayment = req_mon_payment(
+      loanAmt,
+      loanAprCommitted / 100,
+      loanLength
+    );
 
     let monthlyContributionActual =
       monthlyContribution * contributionBalanceCommitted;
@@ -125,7 +136,8 @@ function App() {
     );
     const netWorth = investBalance - loanBalance;
     const cashInvestmentValue = investBalance * (1 - taxRate);
-    const outOfPocket = loanPayment + monthlyContributionActual + principalPayment;
+    const outOfPocket =
+      loanPayment + monthlyContributionActual + principalPayment;
     return {
       date,
       month: monthNumber,
@@ -159,7 +171,8 @@ function App() {
           new Date(),
           1,
           invBalanceCurrent,
-          loanBalanceCurrent
+          loanBalanceCurrent,
+          loanTerm
         );
         curChartData.push({
           date,
@@ -192,7 +205,8 @@ function App() {
         date,
         i + 1,
         prevMonth.investBalance,
-        prevMonth.loanBalance
+        prevMonth.loanBalance,
+        loanTerm
       );
       curChartData.push({
         date,
@@ -219,18 +233,23 @@ function App() {
     estDividend,
     timeHorizon,
     contributionBalanceCommitted,
-    monthlyContribution
+    monthlyContribution,
+    loanTerm,
   ]);
 
   return (
     <>
       <div className="flex flex-col gap-16 items-center justify-center min-h-screen py-2 px-2 w-full">
-        <img src="/compare-debt/rocket_money_light.svg" alt="logo" className="h-24" />
+        <img
+          src="/compare-debt/rocket_money_light.svg"
+          alt="logo"
+          className="h-24"
+        />
         <div className="text-3xl font-bold">Investment vs Loan Calculator</div>
 
         <div className="flex flex-col md:w-max gap-2">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="grid w-full max-w-sm gap-1.5">
+            <div className="grid w-full max-w-xs gap-1.5">
               <Label htmlFor="loan-balance" className="w-max">
                 Loan Balance
               </Label>
@@ -243,7 +262,7 @@ function App() {
                 onChange={(e) => setLoanBalanceCurrent(Number(e.target.value))}
               />
             </div>
-            <div className="grid w-full max-w-sm gap-1.5">
+            <div className="grid w-full max-w-xs gap-1.5">
               <Label htmlFor="loan-amt" className="w-max">
                 Total Loan Amount
               </Label>
@@ -281,13 +300,74 @@ function App() {
             </Label>
             <div className="flex items-center gap-2">
               <div className="text-sm text-gray-500 w-16">
-                {req_mon_payment(loanAmt, loanAprLive/100).toFixed(2)}
+                {req_mon_payment(loanAmt, loanAprLive / 100, loanTerm).toFixed(
+                  2
+                )}
               </div>
             </div>
           </div>
+          <Accordion
+            type="single"
+            className="max-w-lg w-full opacity-75 mx-auto"
+            collapsible
+          >
+            <AccordionItem value="mortgage-calc">
+              <AccordionTrigger>Mortgage Equations</AccordionTrigger>
+              <AccordionContent>
+                <div className="flex flex-col gap-2">
+                  <p>
+                    The following is the equation for the monthly payment on the
+                    mortgage.
+                  </p>
+                  <Latex>
+                    {
+                      "$$ M = \\large\\frac{T(I(1 + I) ^ N)}{((1 + I) ^ N) - 1} $$"
+                    }
+                  </Latex>
+                  <Latex>{`$$ M = Monthly\\ Payment = ${req_mon_payment(
+                    loanAmt,
+                    loanAprLive / 100,
+                    loanTerm
+                  ).toFixed(2)} $$`}</Latex>
+                  <Latex>{`$$ T = Total\\ Loan\\ Amount = ${loanAmt} $$`}</Latex>
+                  <Latex>
+                    {`$$ I = \\frac{Annual\\ Interest\\ Rate}{12} = \\frac{${loanAprCommitted}}{12} = ${(
+                      loanAprCommitted / 12
+                    ).toFixed(2)}\\%$$`}
+                  </Latex>
+                  <Latex>{`$$ N = Loan\\ Term\\ in\\ Months = ${
+                    loanTerm * 12
+                  }$$`}</Latex>
+                </div>
+                <div className="flex flex-col gap-2 mt-4">
+                  <p>
+                    The following is the equation for each month's loan balance.
+                  </p>
+                  {/* balance - (mon_pay + prin_pay - balance * (rate / 12)); */}
+                  <Latex>{`$$ R = L - ( M + P - L * I ) $$`}</Latex>
+                  <Latex>{`$$ R = Remaining\\ Loan\\ Balance $$`}</Latex>
+                  <Latex>{`$$ M = Monthly\\ Payment = ${req_mon_payment(
+                    loanAmt,
+                    loanAprLive / 100,
+                    loanTerm
+                  ).toFixed(2)} $$`}</Latex>
+                  <Latex>{`$$ P = Montly\\ Principal\\ Payment = ${
+                    monthlyContribution * (1 - contributionBalanceCommitted)
+                  }$$`}</Latex>
+                  <Latex>{`$$ L = Current\\ Loan\\ Balance $$`}</Latex>
+                  <Latex>
+                    {`$$ I = \\frac{Annual\\ Interest\\ Rate}{12} = ${(
+                      loanAprCommitted / 12
+                    ).toFixed(2)}\\%$$`}
+                  </Latex>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
+
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="grid w-full max-w-sm gap-1.5">
+          <div className="grid w-full max-w-xs gap-1.5">
             <Label htmlFor="inv-balance" className="w-max">
               Investment Balance
             </Label>
@@ -300,7 +380,7 @@ function App() {
               onChange={(e) => setInvBalanceCurrent(Number(e.target.value))}
             />
           </div>
-          <div className="grid w-full max-w-sm gap-1.5">
+          <div className="grid w-full max-w-xs gap-1.5">
             <Label htmlFor="inv-apr" className="w-max">
               Avg Annual Return
             </Label>
@@ -318,7 +398,7 @@ function App() {
               <div className="text-sm text-gray-500 w-6">%</div>
             </div>
           </div>
-          <div className="grid w-full max-w-sm gap-1.5">
+          <div className="grid w-full max-w-xs gap-1.5">
             <Label htmlFor="inv-apr" className="w-max">
               Expense Ratio
             </Label>
@@ -336,7 +416,7 @@ function App() {
               <div className="text-sm text-gray-500 w-6">%</div>
             </div>
           </div>
-          <div className="grid w-full max-w-sm gap-1.5">
+          <div className="grid w-full max-w-xs gap-1.5">
             <Label htmlFor="inv-apr" className="w-max">
               Est. Dividend
             </Label>
@@ -360,7 +440,7 @@ function App() {
           />
         </div>
         <div className="grid grid-cols-2 gap-4 mx-auto">
-          <div className="grid w-full max-w-sm gap-1.5">
+          <div className="grid w-full max-w-xs gap-1.5">
             <Label htmlFor="time-horizon" className="w-max">
               Time Horizon
             </Label>
@@ -377,7 +457,7 @@ function App() {
               <div className="text-sm text-gray-500 w-6">years</div>
             </div>
           </div>
-          <div className="grid w-full max-w-sm gap-1.5">
+          <div className="grid w-full max-w-xs gap-1.5">
             <Label htmlFor="monthly-contribution" className="w-max">
               Monthly Contribution
             </Label>
@@ -421,6 +501,54 @@ function App() {
             </div>
           </div>
         </div>
+        <Accordion
+          type="single"
+          className="w-full max-w-lg opacity-75 mx-auto"
+          collapsible
+        >
+          <AccordionItem value="mortgage-calc">
+            <AccordionTrigger>Investment Equations</AccordionTrigger>
+            <AccordionContent>
+              <div className="flex flex-col gap-2">
+                <p>
+                  The following is the equation for the monthly investment
+                  balance.
+                </p>
+                {/* invest_balance +
+                invest_balance * (return_rate / 12 - exp_ratio / 12) +
+                calc_dividends(invest_balance, dividend_rate, timeFrame) +
+                monthly_contribution; */}
+                <Latex>
+                  {
+                    "$$ B = C + C * ( \\frac{F}{12} - \\frac{E}{12} ) + D + G $$"
+                  }
+                </Latex>
+                <Latex>{"$$ B = Investment\\ Balance $$"}</Latex>
+                <Latex>{"$$ C = Current\\ Investment\\ Balance $$"}</Latex>
+                <Latex>{`$$ F = Annual\\ Return\\ Rate = ${invApr}\\%$$`}</Latex>
+                <Latex>{`$$ E = Expense\\ Ratio $$ = ${expenseRatio}`}</Latex>
+                <Latex>{`$$ D = Monthly\\ Dividends = C * D_R $$`}</Latex>
+                <Latex>{`$$ D_R = Dividend\\ Rate = \\frac{${estDividend}}{${
+                  timeFrame == "monthly" ? 1 : timeFrame == "quarterly" ? 3 : 12
+                }}\\%$$`}</Latex>
+                <Latex>{`$$ G = Monthly Contribution = ${
+                  monthlyContribution * contributionBalanceCommitted
+                } $$`}</Latex>
+              </div>
+              <div className="flex flex-col gap-2 mt-4">
+                <p>
+                  In order to calculate the cash value of the investment, we
+                  need to apply the tax rate to the investment balance. We use
+                  20% capital gains tax and 3.8% Net Investment Income Tax.
+                </p>
+                <Latex>{"$$ A = C * TR $$"}</Latex>
+                <Latex>{"$$ A = Cash\\ Investment\\ Value $$"}</Latex>
+                <Latex>{"$$ C = Current\\ Investment\\ Balance $$"}</Latex>
+                <Latex>{`$$ TR = Tax\\ Rate = ${taxRate * 100}\\%$$`}</Latex>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
         <div className="w-full h-96">
           <TimeChart data={chartData} />
         </div>
