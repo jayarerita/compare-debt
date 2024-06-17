@@ -25,7 +25,7 @@ export const DataTable = ({ data }: { data: ChartData[] }) => {
           <TableHead>Net Worth</TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody className="max-h-[12rem] overflow-y-auto">
+      <TableBody >
         {data.map((row) => (
           <TableRow key={row.month}>
             <TableCell>{row.name}</TableCell>

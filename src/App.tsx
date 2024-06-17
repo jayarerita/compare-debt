@@ -224,12 +224,12 @@ function App() {
 
   return (
     <>
-      <div className="flex flex-col gap-16 items-center justify-center min-h-screen py-2">
-        <img src="/rocket_money_light.svg" alt="logo" className="h-24" />
+      <div className="flex flex-col gap-16 items-center justify-center min-h-screen py-2 px-2 w-full">
+        <img src="/compare-debt/rocket_money_light.svg" alt="logo" className="h-24" />
         <div className="text-3xl font-bold">Investment vs Loan Calculator</div>
 
-        <div className="flex flex-col w-max gap-2">
-          <div className="grid grid-cols-3 gap-4">
+        <div className="flex flex-col md:w-max gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="grid w-full max-w-sm gap-1.5">
               <Label htmlFor="loan-balance" className="w-max">
                 Loan Balance
@@ -286,7 +286,7 @@ function App() {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div className="grid w-full max-w-sm gap-1.5">
             <Label htmlFor="inv-balance" className="w-max">
               Investment Balance

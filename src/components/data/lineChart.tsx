@@ -24,8 +24,20 @@ export default function TimeChart({ data }: { data: any }) {
         }}
       >
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" />
-        <YAxis />
+        <XAxis
+          dataKey="name"
+          // @ts-expect-error Not using tickItem, index but required by recharts
+          tickFormatter={(tickItem, index) => {
+            return `${tickItem.split("/")[0]}/${tickItem.split("/")[2]}`;
+            }}
+           />
+        <YAxis 
+          // @ts-expect-error Not using tickItem, index but required by recharts
+          tickFormatter={(tickItem, index) => {
+          return tickItem >= 1000 ? `${tickItem / 1000}k` : tickItem;
+          }}
+          width={40}
+          />
         <Tooltip
           // @ts-expect-error Not using name, item, index, payload but required by recharts
           formatter={(value, name, item, index, payload) =>
