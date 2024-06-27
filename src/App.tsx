@@ -291,7 +291,19 @@ function App() {
                 onValueChange={(value) => setLoanAprLive(value[0])}
                 onValueCommit={(value) => setLoanAprCommitted(value[0])}
               />
-              <div className="text-sm text-gray-500 w-16">{loanAprLive}%</div>
+              <Input
+                type="number"
+                id="loan-apr"
+                className="ml-2 w-20"
+                max={15}
+                min={0}
+                value={loanAprLive}
+                onChange={(e) => {
+                  setLoanAprLive(Number(e.target.value));
+                  setLoanAprCommitted(Number(e.target.value));
+                }}
+              />
+              <div className="text-sm text-gray-500 w-4">%</div>
             </div>
           </div>
           <div className="grid w-full gap-1.5">
@@ -300,6 +312,7 @@ function App() {
             </Label>
             <div className="flex items-center gap-2">
               <div className="text-sm text-gray-500 w-16">
+                $
                 {req_mon_payment(loanAmt, loanAprLive / 100, loanTerm).toFixed(
                   2
                 )}

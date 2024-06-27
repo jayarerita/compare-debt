@@ -29,15 +29,24 @@ export default function TimeChart({ data }: { data: any }) {
           // @ts-expect-error Not using tickItem, index but required by recharts
           tickFormatter={(tickItem, index) => {
             return `${tickItem.split("/")[0]}/${tickItem.split("/")[2]}`;
-            }}
-           />
-        <YAxis 
+          }}
+        />
+        <YAxis
           // @ts-expect-error Not using tickItem, index but required by recharts
           tickFormatter={(tickItem, index) => {
-          return tickItem >= 1000 ? `${tickItem / 1000}k` : tickItem;
+            if (tickItem < 0) {
+              if (tickItem <= -1000000) {
+                return `${tickItem / 1000000}M`;
+              }
+              return tickItem <= 1000 ? `${tickItem / 1000}k` : tickItem;
+            }
+            if (tickItem >= 1000000) {
+              return `${tickItem / 1000000}M`;
+            }
+            return tickItem >= 1000 ? `${tickItem / 1000}k` : tickItem;
           }}
           width={40}
-          />
+        />
         <Tooltip
           // @ts-expect-error Not using name, item, index, payload but required by recharts
           formatter={(value, name, item, index, payload) =>
@@ -63,6 +72,7 @@ export default function TimeChart({ data }: { data: any }) {
           stroke="#3894d2"
           dot={false}
         />
+        <Line type="monotone" dataKey="netWorth" stroke="#50C878" dot={false} />
       </LineChart>
     </ResponsiveContainer>
   );
